@@ -1,0 +1,50 @@
+name: Deploy Store App and CDK Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      PRODUCT_TABLE_NAME: products-table
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Spring Boot JAR
+        run: ./gradlew bootJar
+
+      - name: Install CDK dependencies
+        run: |
+          cd cdk-java
+          mvn install -DskipTests
+
+      - name: CDK Bootstrap (if needed)
+        run: |
+          cd cdk-java
+          npx cdk bootstrap aws://${{ env.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }}
+
+      - name: Deploy CDK Stack
+        run: |
+          cd cdk-java
+          npx cdk deploy --require-approval never
+
